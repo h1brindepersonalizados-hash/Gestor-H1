@@ -1,8 +1,9 @@
 
 import React, { createContext, useReducer, useContext, ReactNode } from 'react';
-import type { Client, Product, Quote, CompanyData } from '../types';
+import type { Client, Product, Quote, CompanyData, User } from '../types';
 import { MOCK_CLIENTS, MOCK_PRODUCTS, MOCK_QUOTES } from '../data/mockData';
 import { COMPANY_DATA } from '../data/companyData';
+import { USER_DATA } from '../data/userData';
 import { QuoteStatus } from '../types';
 
 interface AppState {
@@ -10,6 +11,7 @@ interface AppState {
   products: Product[];
   quotes: Quote[];
   companyData: CompanyData;
+  user: User;
 }
 
 type Action =
@@ -23,13 +25,15 @@ type Action =
   | { type: 'UPDATE_QUOTE'; payload: Quote }
   | { type: 'DELETE_QUOTE'; payload: string }
   | { type: 'UPDATE_QUOTE_STATUS'; payload: { id: string; status: QuoteStatus } }
-  | { type: 'UPDATE_COMPANY_DATA', payload: CompanyData };
+  | { type: 'UPDATE_COMPANY_DATA', payload: CompanyData }
+  | { type: 'UPDATE_USER_CREDENTIALS', payload: User };
 
 const initialState: AppState = {
   clients: MOCK_CLIENTS,
   products: MOCK_PRODUCTS,
   quotes: MOCK_QUOTES,
   companyData: COMPANY_DATA,
+  user: USER_DATA,
 };
 
 const dataReducer = (state: AppState, action: Action): AppState => {
@@ -70,6 +74,11 @@ const dataReducer = (state: AppState, action: Action): AppState => {
         return {
             ...state,
             companyData: action.payload,
+        };
+    case 'UPDATE_USER_CREDENTIALS':
+        return {
+            ...state,
+            user: action.payload,
         };
     default:
       return state;

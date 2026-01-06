@@ -8,8 +8,10 @@ import { QuoteStatus } from '../types';
 
 const Dashboard: React.FC = () => {
   const { state } = useData();
-  const { clients, products, quotes } = state;
+  const { clients, products, quotes, user } = state;
   
+  const isDefaultPassword = user.password === '123';
+
   const quotesThisMonth = quotes.filter(q => {
     const quoteDate = q.createdAt;
     const today = new Date();
@@ -32,6 +34,13 @@ const Dashboard: React.FC = () => {
 
   return (
     <div>
+      {isDefaultPassword && (
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded-md shadow-sm" role="alert">
+          <p className="font-bold">Aviso de Segurança</p>
+          <p>Sua senha é a padrão. Por segurança, recomendamos fortemente que você <Link to="/settings" className="font-bold underline hover:text-yellow-800">altere sua senha</Link> o mais rápido possível.</p>
+        </div>
+      )}
+
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Dashboard</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">

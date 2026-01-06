@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { H1BrindesLogo } from '../components/icons';
+import { useData } from '../context/DataContext';
 
 interface LoginProps {
   onLogin: () => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('admin123');
+  const { state } = useData();
+  const { user } = state;
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple mock authentication
-    if (email === 'admin@example.com' && password === 'admin123') {
+    if (email === user.email && password === user.password) {
       setError('');
       onLogin();
       navigate('/');

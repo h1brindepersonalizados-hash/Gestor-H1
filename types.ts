@@ -38,7 +38,7 @@ export interface QuoteItem {
 }
 
 export interface Quote {
-  id: string;
+  id:string;
   clientId: string;
   items: QuoteItem[];
   total: number;
@@ -60,4 +60,9 @@ export interface CompanyData {
   };
   phone: string;
   email: string;
+}
+
+export interface User {
+    email: string;
+    password: string;
 }
