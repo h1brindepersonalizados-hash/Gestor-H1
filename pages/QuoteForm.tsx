@@ -15,41 +15,33 @@ const QuoteForm: React.FC = () => {
   const isEditing = !!id;
   
   const existingQuote = useMemo(() => {
-    return id ? state.quotes.find(q => q.id === id) : null;
-  }, [id, state.quotes]);
+    return id ? quotes.find(q => q.id === id) : null;
+  }, [id, quotes]);
 
   const [productSearch, setProductSearch] = useState('');
   const minDate = useMemo(() => getMinShippingDateISO(), []);
 
   // Effect to initialize or clear the draft when the component mounts or route changes
   useEffect(() => {
-    const defaultNewQuote = {
-      clientId: '', items: [] as QuoteItem[], shippingDate: '', paymentMethod: '',
+    const defaultNewQuote: Partial<Quote> = {
+      clientId: '', items: [], shippingDate: '', paymentMethod: '',
       observations: '', shippingFee: 0, status: QuoteStatus.Open
     };
 
-    let needsInitialization = false;
-    let initialDraft: Partial<Quote>;
-
     if (isEditing) {
-      if (!draftQuote || draftQuote.id !== id) {
-        needsInitialization = true;
-        initialDraft = existingQuote || defaultNewQuote;
-      }
-    } else { // Creating new quote
-      if (draftQuote && draftQuote.id) {
-        needsInitialization = true;
-        initialDraft = defaultNewQuote;
-      } else if (!draftQuote) {
-        needsInitialization = true;
-        initialDraft = defaultNewQuote;
-      }
+        // Editing: if draft is not for this quote, load it from main state
+        if (!draftQuote || draftQuote.id !== id) {
+            // If quote is not found for the ID, it could be a bad link.
+            // We'll proceed with an empty form to avoid crashing, but this could be improved (e.g., redirect).
+            const initialDraft = existingQuote ? { ...existingQuote } : { ...defaultNewQuote, id };
+            dispatch({ type: 'SET_DRAFT_QUOTE', payload: initialDraft });
+        }
+    } else {
+        // Creating: if no draft exists, or if the draft is from an old edit (has an ID), reset it
+        if (!draftQuote || draftQuote.id) {
+            dispatch({ type: 'SET_DRAFT_QUOTE', payload: defaultNewQuote });
+        }
     }
-
-    if (needsInitialization) {
-      dispatch({ type: 'SET_DRAFT_QUOTE', payload: initialDraft! });
-    }
-    
   }, [id, isEditing, existingQuote, draftQuote, dispatch]);
   
   const subtotal = useMemo(() => {
@@ -96,13 +88,19 @@ const QuoteForm: React.FC = () => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!draftQuote || !draftQuote.clientId || !draftQuote.items || draftQuote.items.length === 0) {
+    if (!draftQuote || !draftQuote.clientId || draftQuote.clientId === '' || !draftQuote.items || draftQuote.items.length === 0) {
       alert('Por favor, selecione um cliente e adicione pelo menos um produto.');
       return;
     }
 
+    if (isEditing && !existingQuote) {
+        alert('Erro: O orçamento que você está tentando editar não foi encontrado.');
+        navigate('/quotes');
+        return;
+    }
+
     const quoteData: Quote = {
-      id: isEditing ? existingQuote!.id : `q${Date.now()}`,
+      id: isEditing ? existingQuote.id : `q${Date.now()}`,
       clientId: draftQuote.clientId,
       items: draftQuote.items,
       shippingFee: draftQuote.shippingFee || 0,
@@ -110,8 +108,8 @@ const QuoteForm: React.FC = () => {
       shippingDate: draftQuote.shippingDate || '',
       paymentMethod: draftQuote.paymentMethod || '',
       observations: draftQuote.observations || '',
-      status: isEditing ? existingQuote!.status : QuoteStatus.Open,
-      createdAt: isEditing ? existingQuote!.createdAt : new Date(),
+      status: isEditing ? existingQuote.status : QuoteStatus.Open,
+      createdAt: isEditing ? existingQuote.createdAt : new Date(),
     };
     
     if (isEditing) {
