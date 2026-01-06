@@ -23,6 +23,7 @@ const QuoteDetail: React.FC = () => {
     }
     
     const client = state.clients.find(c => c.id === quote.clientId);
+    const subtotal = quote.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     
     const handleDelete = () => {
         if (window.confirm('Tem certeza que deseja excluir este orçamento?')) {
@@ -47,10 +48,17 @@ const QuoteDetail: React.FC = () => {
                 message += `_Qtd: ${item.quantity} x ${formatCurrency(item.unitPrice)} = ${formatCurrency(item.quantity * item.unitPrice)}_\n\n`;
             }
         });
+
+        const currentSubtotal = quote.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+        
+        if (quote.shippingFee > 0) {
+            message += `*Subtotal: ${formatCurrency(currentSubtotal)}*\n`;
+            message += `*Frete: ${formatCurrency(quote.shippingFee)}*\n\n`;
+        }
         
         message += `*VALOR TOTAL: ${formatCurrency(quote.total)}*\n\n`;
         message += `Forma de Pagamento: ${quote.paymentMethod}\n`;
-        message += `Prazo de Entrega: ${quote.deliveryTime}\n\n`;
+        message += `Data de Envio: ${formatDate(quote.shippingDate)}\n\n`;
         if (quote.observations) {
             message += `Observações: ${quote.observations}\n\n`;
         }
@@ -128,7 +136,7 @@ const QuoteDetail: React.FC = () => {
                     <h2 className="text-lg font-semibold text-gray-700 mb-2">Detalhes</h2>
                     <div className="text-gray-600">
                       <p><span className="font-semibold">Pagamento:</span> {quote.paymentMethod}</p>
-                      <p><span className="font-semibold">Prazo de Entrega:</span> {quote.deliveryTime}</p>
+                      <p><span className="font-semibold">Data de Envio:</span> {formatDate(quote.shippingDate)}</p>
                        {quote.observations && <p><span className="font-semibold">Observações:</span> {quote.observations}</p>}
                     </div>
                 </div>
@@ -161,9 +169,19 @@ const QuoteDetail: React.FC = () => {
             </div>
 
             <div className="flex justify-end items-center mb-8">
-                <div className="text-right">
-                    <p className="text-gray-600">Subtotal: {formatCurrency(quote.total)}</p>
-                    <p className="text-xl font-bold text-gray-800">Total: {formatCurrency(quote.total)}</p>
+                <div className="text-right w-64 space-y-1">
+                    <div className="flex justify-between items-center">
+                        <p className="text-gray-600">Subtotal:</p>
+                        <p className="text-gray-800">{formatCurrency(subtotal)}</p>
+                    </div>
+                     <div className="flex justify-between items-center">
+                        <p className="text-gray-600">Frete:</p>
+                        <p className="text-gray-800">{formatCurrency(quote.shippingFee)}</p>
+                    </div>
+                    <div className="flex justify-between items-center border-t pt-2 mt-2">
+                        <p className="text-xl font-bold text-gray-800">Total:</p>
+                        <p className="text-xl font-bold text-gray-800">{formatCurrency(quote.total)}</p>
+                    </div>
                 </div>
             </div>
 

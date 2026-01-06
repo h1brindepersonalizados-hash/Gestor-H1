@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
-import { Trash2Icon, PlusCircleIcon, SearchIcon } from '../components/icons';
-import { formatCurrency } from '../utils/helpers';
+import { Trash2Icon, SearchIcon } from '../components/icons';
+import { formatCurrency, getMinShippingDateISO } from '../utils/helpers';
 import type { QuoteItem, Quote } from '../types';
 import { QuoteStatus } from '../types';
 
@@ -10,7 +10,7 @@ const QuoteForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { state, dispatch } = useData();
-  const { clients, products } = state;
+  const { clients, products, quotes, draftQuote } = state;
 
   const isEditing = !!id;
   
@@ -18,60 +18,98 @@ const QuoteForm: React.FC = () => {
     return id ? state.quotes.find(q => q.id === id) : null;
   }, [id, state.quotes]);
 
-  const [clientId, setClientId] = useState(existingQuote?.clientId || '');
-  const [items, setItems] = useState<QuoteItem[]>(existingQuote?.items || []);
-  const [deliveryTime, setDeliveryTime] = useState(existingQuote?.deliveryTime || '');
-  const [paymentMethod, setPaymentMethod] = useState(existingQuote?.paymentMethod || '');
-  const [observations, setObservations] = useState(existingQuote?.observations || '');
-  
   const [productSearch, setProductSearch] = useState('');
+  const minDate = useMemo(() => getMinShippingDateISO(), []);
+
+  // Effect to initialize or clear the draft when the component mounts or route changes
+  useEffect(() => {
+    const defaultNewQuote = {
+      clientId: '', items: [] as QuoteItem[], shippingDate: '', paymentMethod: '',
+      observations: '', shippingFee: 0, status: QuoteStatus.Open
+    };
+
+    let needsInitialization = false;
+    let initialDraft: Partial<Quote>;
+
+    if (isEditing) {
+      if (!draftQuote || draftQuote.id !== id) {
+        needsInitialization = true;
+        initialDraft = existingQuote || defaultNewQuote;
+      }
+    } else { // Creating new quote
+      if (draftQuote && draftQuote.id) {
+        needsInitialization = true;
+        initialDraft = defaultNewQuote;
+      } else if (!draftQuote) {
+        needsInitialization = true;
+        initialDraft = defaultNewQuote;
+      }
+    }
+
+    if (needsInitialization) {
+      dispatch({ type: 'SET_DRAFT_QUOTE', payload: initialDraft! });
+    }
+    
+  }, [id, isEditing, existingQuote, draftQuote, dispatch]);
+  
+  const subtotal = useMemo(() => {
+    return draftQuote?.items?.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0) || 0;
+  }, [draftQuote?.items]);
 
   const total = useMemo(() => {
-    return items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  }, [items]);
+    return subtotal + (draftQuote?.shippingFee || 0);
+  }, [subtotal, draftQuote?.shippingFee]);
 
   const availableProducts = useMemo(() => {
     return products.filter(p => 
-      !items.some(item => item.productId === p.id) &&
+      !draftQuote?.items?.some(item => item.productId === p.id) &&
       p.name.toLowerCase().includes(productSearch.toLowerCase())
     );
-  }, [products, items, productSearch]);
+  }, [products, draftQuote?.items, productSearch]);
+
+  const updateDraft = (updatedFields: Partial<Quote>) => {
+    dispatch({ type: 'SET_DRAFT_QUOTE', payload: { ...(draftQuote || {}), ...updatedFields, id: isEditing ? id : undefined } });
+  }
   
   const handleAddProduct = (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
-      setItems([...items, { productId, quantity: 1, unitPrice: product.sellPrice }]);
+      const newItems = [...(draftQuote?.items || []), { productId, quantity: 1, unitPrice: product.sellPrice }];
+      updateDraft({ items: newItems });
       setProductSearch('');
     }
   };
 
   const handleUpdateItem = (index: number, field: 'quantity' | 'unitPrice', value: number) => {
-    const newItems = [...items];
+    if (!draftQuote?.items) return;
+    const newItems = [...draftQuote.items];
     if(value >= 0) {
         newItems[index] = { ...newItems[index], [field]: value };
-        setItems(newItems);
+        updateDraft({ items: newItems });
     }
   };
 
   const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    const newItems = draftQuote?.items?.filter((_, i) => i !== index) || [];
+    updateDraft({ items: newItems });
   };
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId || items.length === 0) {
+    if (!draftQuote || !draftQuote.clientId || !draftQuote.items || draftQuote.items.length === 0) {
       alert('Por favor, selecione um cliente e adicione pelo menos um produto.');
       return;
     }
 
     const quoteData: Quote = {
       id: isEditing ? existingQuote!.id : `q${Date.now()}`,
-      clientId,
-      items,
-      total,
-      deliveryTime,
-      paymentMethod,
-      observations,
+      clientId: draftQuote.clientId,
+      items: draftQuote.items,
+      shippingFee: draftQuote.shippingFee || 0,
+      total: total,
+      shippingDate: draftQuote.shippingDate || '',
+      paymentMethod: draftQuote.paymentMethod || '',
+      observations: draftQuote.observations || '',
       status: isEditing ? existingQuote!.status : QuoteStatus.Open,
       createdAt: isEditing ? existingQuote!.createdAt : new Date(),
     };
@@ -81,9 +119,15 @@ const QuoteForm: React.FC = () => {
     } else {
         dispatch({ type: 'ADD_QUOTE', payload: quoteData });
     }
-
+    
+    // Clear draft after successful submission
+    dispatch({ type: 'SET_DRAFT_QUOTE', payload: null });
     navigate(`/quotes/${quoteData.id}`);
   };
+
+  if (!draftQuote) {
+    return <div>Carregando formulário...</div>;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto">
@@ -92,8 +136,8 @@ const QuoteForm: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold mb-4">Cliente</h2>
         <select
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
+          value={draftQuote.clientId || ''}
+          onChange={(e) => updateDraft({ clientId: e.target.value })}
           required
           className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
         >
@@ -118,7 +162,7 @@ const QuoteForm: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {items.map((item, index) => {
+              {draftQuote.items?.map((item, index) => {
                 const product = products.find(p => p.id === item.productId);
                 return (
                   <tr key={index} className="border-t">
@@ -140,7 +184,7 @@ const QuoteForm: React.FC = () => {
               })}
             </tbody>
           </table>
-           {items.length === 0 && <p className="text-center py-4 text-gray-500">Nenhum produto adicionado.</p>}
+           {draftQuote.items?.length === 0 && <p className="text-center py-4 text-gray-500">Nenhum produto adicionado.</p>}
         </div>
 
         <div className="relative">
@@ -161,19 +205,38 @@ const QuoteForm: React.FC = () => {
         <h2 className="text-xl font-semibold mb-4">Detalhes e Total</h2>
         <div className="grid md:grid-cols-2 gap-4">
             <div>
-                <label className="block text-sm font-medium text-gray-700">Prazo de Entrega</label>
-                <input type="text" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} className="w-full mt-1 p-2 border rounded-lg" />
+                <label className="block text-sm font-medium text-gray-700">Data de Envio</label>
+                <input
+                  type="date"
+                  value={draftQuote.shippingDate || ''}
+                  min={minDate}
+                  onChange={(e) => updateDraft({ shippingDate: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-lg"
+                  required
+                />
             </div>
             <div>
                 <label className="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
-                <input type="text" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full mt-1 p-2 border rounded-lg" />
+                <input type="text" value={draftQuote.paymentMethod || ''} onChange={(e) => updateDraft({ paymentMethod: e.target.value })} className="w-full mt-1 p-2 border rounded-lg" />
+            </div>
+             <div>
+                <label className="block text-sm font-medium text-gray-700">Frete (R$)</label>
+                <input 
+                    type="number" 
+                    step="0.01"
+                    value={draftQuote.shippingFee || 0} 
+                    onChange={(e) => updateDraft({ shippingFee: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 p-2 border rounded-lg" 
+                />
             </div>
             <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700">Observações</label>
-                <textarea value={observations} onChange={(e) => setObservations(e.target.value)} rows={3} className="w-full mt-1 p-2 border rounded-lg"></textarea>
+                <textarea value={draftQuote.observations || ''} onChange={(e) => updateDraft({ observations: e.target.value })} rows={3} className="w-full mt-1 p-2 border rounded-lg"></textarea>
             </div>
         </div>
-        <div className="text-right mt-6">
+        <div className="text-right mt-6 space-y-2">
+            <p className="text-lg text-gray-600">Subtotal: {formatCurrency(subtotal)}</p>
+            <p className="text-lg text-gray-600">Frete: {formatCurrency(draftQuote.shippingFee || 0)}</p>
             <span className="text-2xl font-bold text-gray-800">Total: {formatCurrency(total)}</span>
         </div>
       </div>

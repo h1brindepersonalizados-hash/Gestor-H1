@@ -12,6 +12,7 @@ interface AppState {
   quotes: Quote[];
   companyData: CompanyData;
   user: User;
+  draftQuote: Partial<Quote> | null;
 }
 
 type Action =
@@ -26,7 +27,8 @@ type Action =
   | { type: 'DELETE_QUOTE'; payload: string }
   | { type: 'UPDATE_QUOTE_STATUS'; payload: { id: string; status: QuoteStatus } }
   | { type: 'UPDATE_COMPANY_DATA', payload: CompanyData }
-  | { type: 'UPDATE_USER_CREDENTIALS', payload: User };
+  | { type: 'UPDATE_USER_CREDENTIALS', payload: User }
+  | { type: 'SET_DRAFT_QUOTE', payload: Partial<Quote> | null };
 
 const initialState: AppState = {
   clients: MOCK_CLIENTS,
@@ -34,6 +36,7 @@ const initialState: AppState = {
   quotes: MOCK_QUOTES,
   companyData: COMPANY_DATA,
   user: USER_DATA,
+  draftQuote: null,
 };
 
 const dataReducer = (state: AppState, action: Action): AppState => {
@@ -79,6 +82,11 @@ const dataReducer = (state: AppState, action: Action): AppState => {
         return {
             ...state,
             user: action.payload,
+        };
+    case 'SET_DRAFT_QUOTE':
+        return {
+            ...state,
+            draftQuote: action.payload,
         };
     default:
       return state;

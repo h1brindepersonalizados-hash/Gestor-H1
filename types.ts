@@ -41,8 +41,9 @@ export interface Quote {
   id:string;
   clientId: string;
   items: QuoteItem[];
+  shippingFee: number;
   total: number;
-  deliveryTime: string;
+  shippingDate: string;
   paymentMethod: string;
   observations: string;
   status: QuoteStatus;
